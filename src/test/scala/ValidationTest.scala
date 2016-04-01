@@ -5,7 +5,7 @@ import org.scalatest.WordSpec
 import scalaz._
 import scalaz.Scalaz._
 
-// based on (and fixes) use case in https://www.innoq.com/en/blog/validate-your-domain-in-scala/
+// based on (and fixes) examples in https://www.innoq.com/en/blog/validate-your-domain-in-scala/
 class ValidationTest extends WordSpec with Matchers {
   import Model._
 
@@ -17,12 +17,10 @@ class ValidationTest extends WordSpec with Matchers {
       instruments = List(Guitar, BassGuitar),
       currentBand = Option(opeth)
     )
+    val badMikael = mikael.copy(born = LocalDate.now.minusYears(2), instruments = Nil)
 
-    val badMikael = mikael.copy(born = LocalDate.now.minusYears(2))
-      .copy(instruments = Nil)
-
-    println(validate(mikael))
-    println(validate(badMikael))
+    validate(mikael) shouldBe scalaz.Success(mikael)
+    validate(badMikael) shouldBe scalaz.Failure(NonEmptyList("too young", "at least one instrument"))
   }
 }
 
@@ -44,23 +42,21 @@ object Model {
     formerBands: Seq[MemberOfBand] = Nil
   )
 
-  type StringValidation[T] = Validation[String, T]
-  // type ValidationNel[+E, +X] = Validation[NonEmptyList[E], X]
-
-  def validate(musician: Musician): StringValidation[Musician] = {
-    def validName(name: String): StringValidation[String] =
+  def validate(musician: Musician): ValidationNel[String, Musician] = {
+    def validName(name: String): ValidationNel[String, String] =
       name match {
-        case "" ⇒ "name must not be empty".failure
+        case "" ⇒ scalaz.Failure("name must not be empty").toValidationNel
         case _  ⇒ name.success
       }
 
-    def validateAge(born: LocalDate): StringValidation[LocalDate] =
-      if (born.isAfter(LocalDate.now().minusYears(12))) "too young".failure
+    def validateAge(born: LocalDate): ValidationNel[String, LocalDate] =
+      if (born.isAfter(LocalDate.now().minusYears(12)))
+        scalaz.Failure("too young").toValidationNel
       else born.success
 
-    def validInstrument(instruments: Seq[Instrument]): StringValidation[Seq[Instrument]] =
+    def validInstrument(instruments: Seq[Instrument]): ValidationNel[String, Seq[Instrument]] =
       instruments match {
-        case Nil ⇒ "at least one instrument".failure
+        case Nil ⇒ scalaz.Failure("at least one instrument").toValidationNel
         case _   ⇒ instruments.success
       }
 
